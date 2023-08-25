@@ -2,3 +2,4 @@ google-ads
 google-api-python-client
 streamlit
 openai
+langchain==0.0.272

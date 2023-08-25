@@ -1,14 +1,7 @@
 import streamlit as st
-import openai
+from agent import Receptionist
 
-st.title("ChatGPT-like clone")
-
-# Set OpenAI API key from Streamlit secrets
-openai.api_key = st.secrets["OPENAI_API_KEY"]
-
-# Set a default model
-if "openai_model" not in st.session_state:
-    st.session_state["openai_model"] = "gpt-3.5-turbo"
+st.title("Adalanta")
 
 # Initialize chat history
 if "messages" not in st.session_state:
@@ -29,4 +22,7 @@ if prompt := st.chat_input("What is up?"):
     # Display assistant response in chat message container
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
-        full_response = ""
+        full_response = Receptionist.run(prompt)
+        message_placeholder.markdown(full_response)
+        
+    st.session_state.messages.append({"role": "assistant", "content": full_response})
