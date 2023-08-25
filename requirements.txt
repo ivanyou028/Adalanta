@@ -1,3 +1,4 @@
 google-ads
 google-api-python-client
 streamlit
+openai
