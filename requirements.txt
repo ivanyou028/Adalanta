@@ -3,3 +3,7 @@ google-api-python-client
 streamlit
 openai
 langchain==0.0.272
+flask
+flask-socketio
+flask-cors
+google-search-results

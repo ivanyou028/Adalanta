@@ -1,23 +1,17 @@
-import logo from "./logo.svg";
 import "./App.css";
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import * as firebase from "firebase/app";
-import { getFirestore, doc, setDoc } from "firebase/firestore";
-import { collection, serverTimestamp } from "firebase/firestore";
 import {
   useAuthState,
   useSignOut,
   useSignInWithGoogle,
 } from "react-firebase-hooks/auth";
-import { useCollectionData } from "react-firebase-hooks/firestore";
 import { getAuth } from "firebase/auth";
-import { query, orderBy, limit } from "firebase/firestore";
 import { FIREBASE_CONFIG } from "./firebase-config";
+import { socket, GET_MESSAGES } from "./socket";
 
-// Initialize Firebase
 const app = firebase.initializeApp(FIREBASE_CONFIG);
 const auth = getAuth(app);
-const firestore = getFirestore();
 
 function App() {
   const [user] = useAuthState(auth);
@@ -38,51 +32,44 @@ function App() {
   );
 }
 
-function SignIn() {
-  const [signInWithGoogle, user, loading, error] = useSignInWithGoogle(auth);
-  return (
-    <button
-      onClick={() => signInWithGoogle()}
-      class="rounded-xl border border-gray-400 bg-white px-2 py-1 text-gray-800 shadow hover:bg-gray-100"
-    >
-      {" "}
-      Sign in with Google{" "}
-    </button>
-  );
-}
-
-function SignOut() {
-  const [signOut, loading, error] = useSignOut(auth);
-  return (
-    auth.currentUser && (
-      <button
-        onClick={signOut}
-        class="rounded-xl border border-gray-400 bg-white px-2 py-1 text-gray-800 shadow hover:bg-gray-100"
-      >
-        Sign Out
-      </button>
-    )
-  );
-}
-
 function ChatRoom() {
-  const messagesRef = collection(firestore, "messages");
-  const q = query(messagesRef, orderBy("createdAt"), limit(25));
-  const [messages] = useCollectionData(q);
+  const [messages, setMessages] = useState([]);
+  const [connected, setConnected] = useState(socket.connected);
   const [formValue, setFormValue] = useState("");
   const dummy = useRef();
 
+  useEffect(() => {
+    fetch(GET_MESSAGES)
+      .then((response) => response.json())
+      .then((data) => setMessages(data));
+
+    socket.on("receive_message", (message) => {
+      setMessages((prevMessages) => [...prevMessages, message]);
+    });
+
+    socket.on("connect", () => {
+      setConnected(true);
+    });
+
+    socket.on("disconnect", () => {
+      setConnected(false);
+    });
+
+    return () => {
+      socket.off("receive_message");
+      socket.off("connect");
+      socket.off("disconnect");
+    };
+  }, []);
+
   const sendMessage = async (e) => {
     e.preventDefault();
-    const { uid, photoURL } = auth.currentUser;
-    await setDoc(doc(messagesRef), {
-      text: formValue,
-      createdAt: serverTimestamp(),
-      uid,
-      photoURL,
-    });
-    setFormValue("");
-    dummy.current.scrollIntoView({ behavior: "smooth" });
+    if (connected) {
+      const { uid, photoURL } = auth.currentUser;
+      socket.emit("send_message", { user: uid, text: formValue });
+      dummy.current.scrollIntoView({ behavior: "smooth" });
+      setFormValue(""); // Clear the input
+    }
   };
 
   return (
@@ -111,8 +98,13 @@ function ChatRoom() {
           </div>
           <div class="ml-4">
             <button
-              class="flex flex-shrink-0 items-center justify-center rounded-xl bg-indigo-500 px-4 py-1 font-semibold text-white hover:bg-indigo-600"
+              class={`flex flex-shrink-0 items-center justify-center rounded-xl px-4 py-1 font-semibold ${
+                connected
+                  ? "bg-indigo-500 text-white transition ease-in-out hover:scale-110 hover:bg-indigo-600"
+                  : "cursor-not-allowed bg-gray-400 text-gray-300"
+              }`}
               type="submit"
+              disabled={!connected}
             >
               <span>Send</span>
             </button>
@@ -123,8 +115,21 @@ function ChatRoom() {
   );
 }
 
+function Avatar(props) {
+  const { photoURL } = props;
+  return (
+    <img
+      src={
+        photoURL ??
+        "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png"
+      }
+      class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-indigo-500"
+    />
+  );
+}
+
 function ChatMessage(props) {
-  const { text, uid, photoURL } = props.message;
+  const { text, user: uid, photoURL } = props.message;
   const messageClass = uid === auth.currentUser.uid ? "sent" : "received";
   if (messageClass === "received") {
     return (
@@ -133,11 +138,8 @@ function ChatMessage(props) {
           className={`message ${messageClass}`}
           class="flex flex-row items-center"
         >
-          <img
-            src={photoURL}
-            class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-indigo-500"
-          />
-          <p class="relative ml-3 rounded-xl bg-white px-4 py-2 text-sm shadow">
+          <Avatar photoURL={photoURL} />
+          <p class="relative ml-3 rounded-xl bg-white px-4 py-2 text-sm outline outline-slate-200">
             {text}
           </p>
         </div>
@@ -150,15 +152,39 @@ function ChatMessage(props) {
         className={`message ${messageClass}`}
         class="flex flex-row-reverse items-center justify-start"
       >
-        <img
-          src={photoURL}
-          class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-indigo-500"
-        />
-        <p class="relative mr-3 rounded-xl bg-indigo-100 px-4 py-2 text-sm shadow">
+        <Avatar photoURL={photoURL} />
+        <p class="relative mr-3 rounded-xl bg-indigo-200 px-4 py-2 text-sm shadow shadow-indigo-300">
           {text}
         </p>
       </div>
     </div>
+  );
+}
+
+function SignIn() {
+  const [signInWithGoogle, user, loading, error] = useSignInWithGoogle(auth);
+  return (
+    <button
+      onClick={() => signInWithGoogle()}
+      class="rounded-xl border border-gray-400 bg-white px-2 py-1 text-gray-800 shadow hover:bg-gray-100"
+    >
+      {" "}
+      Sign in with Google{" "}
+    </button>
+  );
+}
+
+function SignOut() {
+  const [signOut, loading, error] = useSignOut(auth);
+  return (
+    auth.currentUser && (
+      <button
+        onClick={signOut}
+        class="rounded-xl border bg-white px-2 py-1 text-gray-500 shadow hover:bg-gray-100"
+      >
+        Sign Out
+      </button>
+    )
   );
 }
 
