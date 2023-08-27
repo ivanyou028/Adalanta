@@ -70,16 +70,15 @@ export default function ChatRoom() {
           </div>
         </div>
         <div class="mt-auto">
-          <SendMessage ref={dummy} connected={connected} waiting={threadBusy} />
+          <SendMessage connected={connected} waiting={threadBusy} />
         </div>
-
         {/* <UploadFile connected={connected}/> */}
       </div>
     </>
   );
 }
 
-const SendMessage = forwardRef((props, ref) => {
+const SendMessage = (props) => {
   const socket = useSocket();
   const [formValue, setFormValue] = useState("");
   const { connected, waiting } = props;
@@ -89,7 +88,6 @@ const SendMessage = forwardRef((props, ref) => {
     if (connected) {
       const { uid, photoURL } = AUTH.currentUser;
       socket.emit("send_message", { user: uid, text: formValue });
-      ref.current.scrollIntoView({ behavior: "smooth" });
       setFormValue(""); // Clear the input
     }
   };
@@ -143,7 +141,7 @@ const SendMessage = forwardRef((props, ref) => {
       </div>
     </form>
   );
-});
+};
 
 function UploadFile(props) {
   const { connected } = props;
