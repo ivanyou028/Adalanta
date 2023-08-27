@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from flask_socketio import SocketIO, emit
+from flask_socketio import SocketIO, emit, disconnect
 from flask_cors import CORS, cross_origin
 from agent import Receptionist
 import threading
@@ -17,19 +17,11 @@ user_data = {}
 user_to_sid = {}
 count = 0
 
-@app.route('/get_messages', methods=['GET'])
+@app.route('/get_messages/<user>', methods=['GET'])
 @cross_origin()
-def get_messages():
+def get_messages(user):
     print("client requests messages")
     return jsonify([message for data in user_data.values() for message in data['messages']])
-
-@app.route('/get_status/<user>', methods=['GET'])
-@cross_origin()
-def get_status(user):
-    if user in user_data:
-        return jsonify(status=user_data[user]['thread_status'])
-    else:
-        return jsonify(status='error', message='No thread started for this user'), 404
 
 @socketio.on('send_message')
 def handle_message(data): 
@@ -39,6 +31,13 @@ def handle_message(data):
     # If this user is not in our data yet, initialize their info
     if user not in user_data:
         user_data[user] = {'messages': [], 'thread_status': 'done'}
+    
+    # If active thread for this user, tell the client it's busy
+    if user_data[user]['thread_status'] != 'done':
+        client_sid = user_to_sid.get(user)
+        if client_sid:
+            socketio.emit('thread_busy', {}, room=client_sid)
+        return
 
     # Only append the message and start a thread if no active thread for this user
     if user_data[user]['thread_status'] == 'done':
@@ -56,9 +55,11 @@ def handle_message(data):
             user_data[user]['thread_status'] = 'running'
             Receptionist(get_notifier(user)).run(data['text'])
             user_data[user]['thread_status'] = 'done'
+            socketio.emit('thread_free', room=client_sid)
 
         thread = threading.Thread(target=thread_function)
         thread.start()
+        socketio.emit('thread_busy', room=client_sid)
 
 def get_notifier(user):
     def notify(log):
@@ -78,17 +79,22 @@ def get_notifier(user):
 def connected():
     global count
     count += 1
-    print(f"client has connected, active client count:{count}")
     user = request.args.get('user')
     if user:
+        if user in user_to_sid.keys():
+            print(f"dropping previous connection for user {user}.") # assume disconnect was sent, so we don't need to decrement count
+            disconnect(sid=user_to_sid[user]) # disconnect previous connection
         user_to_sid[user] = request.sid
+    print(f"client has connected, active client count:{count}.")
 
 @socketio.on("disconnect")
 def disconnected():
+    user = list(user_to_sid.keys())[list(user_to_sid.values()).index(request.sid)]
+    if user:
+        del user_to_sid[user]
     global count
     count -= 1
-    print(f"client disconnected, active client count:{count}")
-
+    print(f"client disconnected, active client count:{count}.")
 
 if __name__ == '__main__':
     socketio.run(app, debug=True)

@@ -11,17 +11,21 @@ import { SocketProvider } from "./socket";
 
 function App() {
   const [user] = useAuthState(AUTH);
-
   return (
     <div className="App">
       <SocketProvider>
-        <div class="flex h-screen  text-gray-800 antialiased">
+        <div class="flex h-screen text-gray-800 antialiased">
           <div class="flex h-full w-full flex-row overflow-x-hidden">
             <div class="flex flex-auto flex-col p-6">
+              {/* header */}
               <div class="flex h-10 w-full flex-row-reverse items-center justify-start bg-white pb-6">
                 <SignOut />
               </div>
-              <div class="h-full">{user ? <ChatRoom /> : <SignIn />}</div>
+
+              {/* main content */}
+              <div class="flex flex-1 flex-col overflow-hidden">
+                {user ? <ChatRoom /> : <SignIn />}
+              </div>
             </div>
           </div>
         </div>
