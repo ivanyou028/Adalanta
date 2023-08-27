@@ -1,17 +1,39 @@
+import React, { useState, createContext, useContext, useEffect } from "react";
+import { AUTH, SOCKET_SERVER_URL } from "./config";
 import io from "socket.io-client";
+import { useAuthState } from "react-firebase-hooks/auth";
 
-const SOCKET_SERVER_URL = "http://localhost:5000";
-export const GET_MESSAGES = `${SOCKET_SERVER_URL}/get_messages`;
-export const socket = io(SOCKET_SERVER_URL);
+const SocketContext = createContext(null);
 
-socket.on("receive_message", (message) => {
-  console.log("Received message:", message);
-});
+export function SocketProvider({ children }) {
+  const [user] = useAuthState(AUTH);
+  const [socket, setSocket] = useState(null);
 
-socket.on("conect", () => {
-  console.log("connected!");
-});
+  useEffect(() => {
+    const uid = user?.uid ?? null;
 
-socket.on("disconnect", () => {
-  console.log("disconnected!");
-});
+    if (uid && !socket) {
+      const newSocket = io(SOCKET_SERVER_URL, {
+        query: { user: uid },
+      });
+      setSocket(newSocket);
+    } else if (!uid && socket) {
+      socket.disconnect();
+      setSocket(null);
+    }
+
+    return () => {
+      if (socket) {
+        socket.disconnect();
+      }
+    };
+  }, [user]);
+
+  return (
+    <SocketContext.Provider value={socket}>{children}</SocketContext.Provider>
+  );
+}
+
+export function useSocket() {
+  return useContext(SocketContext);
+}

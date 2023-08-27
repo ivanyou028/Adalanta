@@ -1,8 +1,9 @@
-import { socket } from "./socket";
-import React, { useRef, useState, useEffect } from "react";
+import { SOCKET } from "./config";
+import React, { useState, useEffect } from "react";
 
-export default function ConnectionStatus() {
-  const [connected, setConnected] = useState(socket.connected);
+export default function ConnectionStatus(props) {
+  const { socket } = props;
+  const [connected, setConnected] = useState(SOCKET.connected);
 
   useEffect(() => {
     socket.on("connect", () => {
