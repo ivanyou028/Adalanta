@@ -170,3 +170,6 @@ key.yaml
 
 # documentation
 /tmp
+
+# db
+/db

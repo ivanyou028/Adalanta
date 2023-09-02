@@ -15,6 +15,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.vectorstores import Chroma
 from loguru import logger
 import os
+from utils.common import PROJECT_ROOT
 
 llm = OpenAI(temperature=0)
 
@@ -43,12 +44,11 @@ class MyCustomHandler(BaseCallbackHandler):
 
 
 class Receptionist:
-    def __init__(self, publish, 
+    def __init__(self, 
                  documentation_url="https://github.com/hwchase17/langchain", 
-                 local_directory="/Users/leon/workdir/Adalanta/tmp/test_repo",
+                 local_directory=PROJECT_ROOT / "tmp/test_repo",
                  default_branch='master',
                  repo_name = "langchain"):
-        self.publish = publish
         self.repo_name = repo_name
         # self.agent = initialize_agent(
         #     # [tool],
@@ -65,11 +65,11 @@ class Receptionist:
                             )
 
         loader = GenericLoader.from_filesystem(
-            local_directory+"/libs/langchain/langchain",
+            local_directory / "libs/langchain/langchain",
             glob="**/*",
             suffixes=[".py"],
             parser=LanguageParser(language=Language.PYTHON,
-                                  parser_threshold=100)
+                                  parser_threshold=500)
         )
         documents = loader.load()
         logger.info({"length of document": len(documents)})
@@ -78,15 +78,17 @@ class Receptionist:
             language=Language.PYTHON, chunk_size=2000, chunk_overlap=200)
         texts = python_splitter.split_documents(documents)
         logger.info({"length of document after split": len(texts)})
-        texts = texts[:100]
-        logger.info("Only keep first 100 for debugging")
+        texts = texts[:500]
+        logger.info("Only keep first 500 for debugging")
 
         embeddings = OpenAIEmbeddings(disallowed_special=())
-        db = Chroma.from_documents(texts, embeddings)
+        persist_directory = PROJECT_ROOT / 'db'
+        db = Chroma.from_documents(texts, embeddings, persist_directory=str(persist_directory))
         self.retriever = db.as_retriever(
             search_type="mmr",  # You can also experiment with "similarity"
             search_kwargs={"k": 8},
         )
+        db.persist()
         self.qa = ConversationalRetrievalChain.from_llm(
             llm, retriever=self.retriever)
 
@@ -96,5 +98,4 @@ class Receptionist:
         self.chat_history.append((query, result["answer"]))
         logger.info(result["answer"])
 
-        self.publish(result["answer"])
-        return "Ask me more about" + self.repo_name
+        return result["answer"]
