@@ -164,3 +164,9 @@ google-ads.yaml
 
 # streamlit
 streamlit/.streamlit/
+
+# credentials
+key.yaml
+
+# documentation
+/tmp

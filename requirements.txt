@@ -7,3 +7,8 @@ flask
 flask-socketio
 flask-cors
 google-search-results
+chromadb
+sentence_transformers
+tiktoken
+GitPython
+python-dotenv
