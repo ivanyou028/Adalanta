@@ -11,4 +11,4 @@ chromadb
 sentence_transformers
 tiktoken
 GitPython
-python-dotenv
+llama-cpp-python

@@ -173,3 +173,6 @@ key.yaml
 
 # db
 /db
+
+# open-source model
+/models

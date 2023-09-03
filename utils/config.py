@@ -38,6 +38,7 @@ class Config(metaclass=Singleton):
         logger.info("Config loading done.")
         self.global_proxy = self._get("GLOBAL_PROXY")
         self.openai_api_key = self._get("OPENAI_API_KEY")
+        self.openai_api_model = self._get("OPENAI_API_MODEL")
         
     def _init_with_config_files_and_env(self, configs: dict, yaml_file):
         """从config/key.yaml / config/config.yaml / env三处按优先级递减加载"""
